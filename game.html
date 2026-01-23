@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizard of Wor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+        #gameContainer {
+            text-align: center;
+        }
+        #gameCanvas {
+            border: 3px solid #0000FF;
+            background: #000;
+        }
+        #controls {
+            color: #FFF;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .key {
+            display: inline-block;
+            background: #333;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 3px;
+            border: 1px solid #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="840" height="520"></canvas>
+        <div id="controls">
+            <p>Steuerung: <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> oder <span class="key">Pfeiltasten</span> = Bewegung | <span class="key">Leertaste</span> = Schießen | <span class="key">R</span> = Neustart</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Spielkonstanten
+        const MAZE_WIDTH = 21;
+        const MAZE_HEIGHT = 13;
+        const CELL_WIDTH = canvas.width / MAZE_WIDTH;
+        const CELL_HEIGHT = canvas.height / MAZE_HEIGHT;
+
+        // Richtungen
+        const Direction = {
+            NONE: 0,
+            UP: 1,
+            DOWN: 2,
+            LEFT: 3,
+            RIGHT: 4
+        };
+
+        // Gegnertypen
+        const EnemyType = {
+            BURWOR: { name: 'Burwor', color: '#FF0000', speed: 1.5, points: 100, canFire: false, canInvisible: false },
+            GARWOR: { name: 'Garwor', color: '#00FFFF', speed: 2, points: 200, canFire: true, canInvisible: true },
+            THORWOR: { name: 'Thorwor', color: '#FF00FF', speed: 2.5, points: 500, canFire: true, canInvisible: true },
+            WORLUK: { name: 'Worluk', color: '#00FF00', speed: 3, points: 1000, canFire: false, canInvisible: false },
+            WIZARD: { name: 'Wizard', color: '#FFFFFF', speed: 2.2, points: 2500, canFire: true, canInvisible: false }
+        };
+
+        // Spielzustand
+        let game = {
+            score: 0,
+            highScore: 0,
+            lives: 3,
+            level: 1,
+            isGameOver: false,
+            isLevelComplete: false,
+            isPaused: false
+        };
+
+        // Labyrinth
+        let maze = [];
+
+        // Spieler
+        let player = {
+            x: 0,
+            y: 0,
+            direction: Direction.NONE,
+            lastDirection: Direction.UP,
+            isAlive: true,
+            speed: 3
+        };
+
+        // Gegner und Schüsse
+        let enemies = [];
+        let bullets = [];
+
+        // Tastenzustand
+        let keys = {};
+
+        // Labyrinth generieren
+        function generateMaze(level) {
+            maze = Array(MAZE_HEIGHT).fill(null).map(() => Array(MAZE_WIDTH).fill(false));
+
+            // Äußere Wände
+            for (let x = 0; x < MAZE_WIDTH; x++) {
+                maze[0][x] = true;
+                maze[MAZE_HEIGHT - 1][x] = true;
+            }
+            for (let y = 0; y < MAZE_HEIGHT; y++) {
+                maze[y][0] = true;
+                maze[y][MAZE_WIDTH - 1] = true;
+            }
+
+            // Teleport-Türen öffnen
+            const doorY = Math.floor(MAZE_HEIGHT / 2);
+            maze[doorY][0] = false;
+            maze[doorY][MAZE_WIDTH - 1] = false;
+
+            // Level-spezifische Layouts
+            switch (level % 5) {
+                case 1: generateDungeon1(); break;
+                case 2: generateDungeon2(); break;
+                case 3: generateDungeon3(); break;
+                case 4: generateDungeon4(); break;
+                case 0: generateDungeon5(); break;
+            }
+        }
+
+        function generateDungeon1() {
+            // Arena mit Säulen
+            for (let x = 2; x < MAZE_WIDTH - 2; x += 4) {
+                maze[3][x] = true;
+                if (x + 1 < MAZE_WIDTH - 2) maze[3][x + 1] = true;
+                maze[MAZE_HEIGHT - 4][x] = true;
+                if (x + 1 < MAZE_WIDTH - 2) maze[MAZE_HEIGHT - 4][x + 1] = true;
+            }
+            for (let y = 5; y < MAZE_HEIGHT - 5; y++) {
+                maze[y][5] = true;
+                maze[y][MAZE_WIDTH - 6] = true;
+            }
+            for (let x = Math.floor(MAZE_WIDTH / 2) - 2; x < Math.floor(MAZE_WIDTH / 2) + 2; x++) {
+                maze[Math.floor(MAZE_HEIGHT / 2) - 1][x] = true;
+                maze[Math.floor(MAZE_HEIGHT / 2) + 1][x] = true;
+            }
+        }
+
+        function generateDungeon2() {
+            // Korridore
+            for (let x = 2; x < MAZE_WIDTH - 2; x++) {
+                if (x % 3 !== 0) {
+                    maze[2][x] = true;
+                    maze[4][x] = true;
+                    maze[MAZE_HEIGHT - 3][x] = true;
+                    maze[MAZE_HEIGHT - 5][x] = true;
+                }
+            }
+            for (let y = 2; y < MAZE_HEIGHT - 2; y++) {
+                if (y % 2 === 0) {
+                    maze[y][4] = true;
+                    maze[y][Math.floor(MAZE_WIDTH / 2)] = true;
+                    maze[y][MAZE_WIDTH - 5] = true;
+                }
+            }
+            maze[Math.floor(MAZE_HEIGHT / 2)][Math.floor(MAZE_WIDTH / 2)] = false;
+            maze[Math.floor(MAZE_HEIGHT / 2)][4] = false;
+            maze[Math.floor(MAZE_HEIGHT / 2)][MAZE_WIDTH - 5] = false;
+        }
+
+        function generateDungeon3() {
+            // Schachbrett
+            for (let y = 2; y < MAZE_HEIGHT - 2; y += 2) {
+                for (let x = 2; x < MAZE_WIDTH - 2; x += 2) {
+                    if ((x + y) % 4 === 0) {
+                        maze[y][x] = true;
+                        if (x + 1 < MAZE_WIDTH - 2) maze[y][x + 1] = true;
+                    }
+                }
+            }
+            for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
+                maze[y][Math.floor(MAZE_WIDTH / 2)] = false;
+            }
+            for (let x = 1; x < MAZE_WIDTH - 1; x++) {
+                maze[Math.floor(MAZE_HEIGHT / 2)][x] = false;
+            }
+        }
+
+        function generateDungeon4() {
+            // Räume
+            for (let x = 2; x < 8; x++) {
+                maze[1][x] = true;
+                maze[5][x] = true;
+            }
+            for (let x = MAZE_WIDTH - 8; x < MAZE_WIDTH - 2; x++) {
+                maze[1][x] = true;
+                maze[5][x] = true;
+            }
+            for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
+                maze[y][2] = true;
+                maze[y][MAZE_WIDTH - 3] = true;
+            }
+            maze[Math.floor(MAZE_HEIGHT / 2)][2] = false;
+            maze[Math.floor(MAZE_HEIGHT / 2)][MAZE_WIDTH - 3] = false;
+            maze[3][2] = false;
+            maze[3][MAZE_WIDTH - 3] = false;
+            for (let x = Math.floor(MAZE_WIDTH / 2) - 3; x < Math.floor(MAZE_WIDTH / 2) + 3; x++) {
+                maze[Math.floor(MAZE_HEIGHT / 2) - 2][x] = true;
+                maze[Math.floor(MAZE_HEIGHT / 2) + 2][x] = true;
+            }
+        }
+
+        function generateDungeon5() {
+            // Boss-Arena
+            const positions = [
+                [4, 3], [MAZE_WIDTH - 5, 3],
+                [4, MAZE_HEIGHT - 4], [MAZE_WIDTH - 5, MAZE_HEIGHT - 4],
+                [Math.floor(MAZE_WIDTH / 2), 3], [Math.floor(MAZE_WIDTH / 2), MAZE_HEIGHT - 4]
+            ];
+            for (const [x, y] of positions) {
+                maze[y][x] = true;
+                if (x + 1 < MAZE_WIDTH - 1) maze[y][x + 1] = true;
+                if (y + 1 < MAZE_HEIGHT - 1) maze[y + 1][x] = true;
+                if (x + 1 < MAZE_WIDTH - 1 && y + 1 < MAZE_HEIGHT - 1) maze[y + 1][x + 1] = true;
+            }
+            for (let x = Math.floor(MAZE_WIDTH / 2) - 1; x < Math.floor(MAZE_WIDTH / 2) + 2; x++) {
+                for (let y = Math.floor(MAZE_HEIGHT / 2) - 1; y < Math.floor(MAZE_HEIGHT / 2) + 2; y++) {
+                    maze[y][x] = true;
+                }
+            }
+        }
+
+        function isWall(gridX, gridY) {
+            if (gridX < 0 || gridX >= MAZE_WIDTH || gridY < 0 || gridY >= MAZE_HEIGHT) return true;
+            return maze[gridY][gridX];
+        }
+
+        function canMoveTo(x, y, width, height) {
+            const padding = 2;
+            const corners = [
+                [x + padding, y + padding],
+                [x + width - padding, y + padding],
+                [x + padding, y + height - padding],
+                [x + width - padding, y + height - padding]
+            ];
+            for (const [cx, cy] of corners) {
+                const gridX = Math.floor(cx / CELL_WIDTH);
+                const gridY = Math.floor(cy / CELL_HEIGHT);
+                if (isWall(gridX, gridY)) return false;
+            }
+            return true;
+        }
+
+        function spawnEnemy(type) {
+            let attempts = 0;
+            while (attempts < 50) {
+                const gridX = Math.floor(Math.random() * (MAZE_WIDTH - 4)) + 2;
+                const gridY = Math.floor(Math.random() * (MAZE_HEIGHT / 2 - 1)) + 1;
+                if (!isWall(gridX, gridY)) {
+                    enemies.push({
+                        x: gridX * CELL_WIDTH,
+                        y: gridY * CELL_HEIGHT,
+                        type: type,
+                        direction: Direction.NONE,
+                        isAlive: true,
+                        isInvisible: false,
+                        invisibilityTimer: 0,
+                        lastDirectionChange: 0,
+                        lastFireTime: 0
+                    });
+                    return;
+                }
+                attempts++;
+            }
+        }
+
+        function initLevel() {
+            generateMaze(game.level);
+            enemies = [];
+            bullets = [];
+
+            player.x = Math.floor(MAZE_WIDTH / 2) * CELL_WIDTH;
+            player.y = (MAZE_HEIGHT - 2) * CELL_HEIGHT;
+            player.direction = Direction.NONE;
+            player.lastDirection = Direction.UP;
+            player.isAlive = true;
+
+            // Gegner spawnen
+            const numBurwors = Math.min(6, 3 + Math.floor(game.level / 2));
+            const numGarwors = game.level >= 2 ? Math.min(3, Math.floor(game.level / 2)) : 0;
+            const numThorwors = game.level >= 4 ? Math.min(2, Math.floor((game.level - 2) / 2)) : 0;
+
+            for (let i = 0; i < numBurwors; i++) spawnEnemy(EnemyType.BURWOR);
+            for (let i = 0; i < numGarwors; i++) spawnEnemy(EnemyType.GARWOR);
+            for (let i = 0; i < numThorwors; i++) spawnEnemy(EnemyType.THORWOR);
+
+            game.isLevelComplete = false;
+            game.worlukSpawned = false;
+            game.wizardSpawned = false;
+        }
+
+        function restart() {
+            game.score = 0;
+            game.lives = 3;
+            game.level = 1;
+            game.isGameOver = false;
+            initLevel();
+        }
+
+        function nextLevel() {
+            game.level++;
+            game.isLevelComplete = false;
+            initLevel();
+        }
+
+        function playerFire() {
+            if (!player.isAlive) return;
+            if (bullets.some(b => b.isPlayerBullet)) return;
+
+            const dir = player.direction !== Direction.NONE ? player.direction : player.lastDirection;
+            bullets.push({
+                x: player.x + CELL_WIDTH / 2,
+                y: player.y + CELL_HEIGHT / 2,
+                direction: dir,
+                isPlayerBullet: true,
+                speed: 8
+            });
+        }
+
+        function enemyFire(enemy) {
+            if (!enemy.type.canFire) return;
+            const now = Date.now();
+            if (now - enemy.lastFireTime < 2000) return;
+
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
+            const dir = Math.abs(dx) > Math.abs(dy)
+                ? (dx > 0 ? Direction.RIGHT : Direction.LEFT)
+                : (dy > 0 ? Direction.DOWN : Direction.UP);
+
+            bullets.push({
+                x: enemy.x + CELL_WIDTH / 2,
+                y: enemy.y + CELL_HEIGHT / 2,
+                direction: dir,
+                isPlayerBullet: false,
+                speed: 6
+            });
+            enemy.lastFireTime = now;
+        }
+
+        function updatePlayer() {
+            if (!player.isAlive) return;
+
+            let newX = player.x;
+            let newY = player.y;
+
+            if (keys['ArrowUp'] || keys['KeyW']) {
+                player.direction = Direction.UP;
+                player.lastDirection = Direction.UP;
+                newY -= player.speed;
+            } else if (keys['ArrowDown'] || keys['KeyS']) {
+                player.direction = Direction.DOWN;
+                player.lastDirection = Direction.DOWN;
+                newY += player.speed;
+            } else if (keys['ArrowLeft'] || keys['KeyA']) {
+                player.direction = Direction.LEFT;
+                player.lastDirection = Direction.LEFT;
+                newX -= player.speed;
+            } else if (keys['ArrowRight'] || keys['KeyD']) {
+                player.direction = Direction.RIGHT;
+                player.lastDirection = Direction.RIGHT;
+                newX += player.speed;
+            } else {
+                player.direction = Direction.NONE;
+            }
+
+            if (canMoveTo(newX, newY, CELL_WIDTH * 0.8, CELL_HEIGHT * 0.8)) {
+                player.x = newX;
+                player.y = newY;
+            }
+
+            // Teleport
+            const doorY = Math.floor(MAZE_HEIGHT / 2);
+            const playerGridY = Math.floor((player.y + CELL_HEIGHT / 2) / CELL_HEIGHT);
+            if (playerGridY === doorY) {
+                if (player.x < 0) player.x = (MAZE_WIDTH - 1) * CELL_WIDTH;
+                if (player.x > (MAZE_WIDTH - 1) * CELL_WIDTH) player.x = 0;
+            }
+        }
+
+        function updateEnemies() {
+            const now = Date.now();
+
+            for (const enemy of enemies) {
+                if (!enemy.isAlive) continue;
+
+                // KI
+                if (now - enemy.lastDirectionChange > 500 + Math.random() * 500) {
+                    const playerGridX = Math.floor(player.x / CELL_WIDTH);
+                    const playerGridY = Math.floor(player.y / CELL_HEIGHT);
+                    const enemyGridX = Math.floor(enemy.x / CELL_WIDTH);
+                    const enemyGridY = Math.floor(enemy.y / CELL_HEIGHT);
+
+                    if (Math.random() < 0.5) {
+                        // Spieler verfolgen
+                        const dx = playerGridX - enemyGridX;
+                        const dy = playerGridY - enemyGridY;
+                        if (Math.abs(dx) > Math.abs(dy)) {
+                            enemy.direction = dx > 0 ? Direction.RIGHT : Direction.LEFT;
+                        } else {
+                            enemy.direction = dy > 0 ? Direction.DOWN : Direction.UP;
+                        }
+                    } else {
+                        // Zufällig
+                        enemy.direction = [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT][Math.floor(Math.random() * 4)];
+                    }
+                    enemy.lastDirectionChange = now;
+                }
+
+                // Bewegung
+                let newX = enemy.x;
+                let newY = enemy.y;
+                const speed = enemy.type.speed;
+
+                switch (enemy.direction) {
+                    case Direction.UP: newY -= speed; break;
+                    case Direction.DOWN: newY += speed; break;
+                    case Direction.LEFT: newX -= speed; break;
+                    case Direction.RIGHT: newX += speed; break;
+                }
+
+                if (canMoveTo(newX, newY, CELL_WIDTH * 0.8, CELL_HEIGHT * 0.8)) {
+                    enemy.x = newX;
+                    enemy.y = newY;
+                } else {
+                    enemy.lastDirectionChange = 0; // Richtung ändern
+                }
+
+                // Unsichtbarkeit
+                if (enemy.type.canInvisible && now - enemy.invisibilityTimer > 3000) {
+                    enemy.isInvisible = !enemy.isInvisible;
+                    enemy.invisibilityTimer = now;
+                }
+
+                // Schießen
+                if (Math.random() < 0.01) {
+                    enemyFire(enemy);
+                }
+
+                // Teleport für Gegner
+                const doorY = Math.floor(MAZE_HEIGHT / 2);
+                const enemyGridY = Math.floor((enemy.y + CELL_HEIGHT / 2) / CELL_HEIGHT);
+                if (enemyGridY === doorY) {
+                    if (enemy.x < 0) enemy.x = (MAZE_WIDTH - 1) * CELL_WIDTH;
+                    if (enemy.x > (MAZE_WIDTH - 1) * CELL_WIDTH) enemy.x = 0;
+                }
+            }
+        }
+
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+
+                switch (bullet.direction) {
+                    case Direction.UP: bullet.y -= bullet.speed; break;
+                    case Direction.DOWN: bullet.y += bullet.speed; break;
+                    case Direction.LEFT: bullet.x -= bullet.speed; break;
+                    case Direction.RIGHT: bullet.x += bullet.speed; break;
+                }
+
+                const gridX = Math.floor(bullet.x / CELL_WIDTH);
+                const gridY = Math.floor(bullet.y / CELL_HEIGHT);
+
+                if (gridX < 0 || gridX >= MAZE_WIDTH || gridY < 0 || gridY >= MAZE_HEIGHT || isWall(gridX, gridY)) {
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+
+        function checkCollisions() {
+            // Spieler-Gegner
+            for (const enemy of enemies) {
+                if (!enemy.isAlive) continue;
+                const dx = Math.abs(player.x - enemy.x);
+                const dy = Math.abs(player.y - enemy.y);
+                if (dx < CELL_WIDTH * 0.6 && dy < CELL_HEIGHT * 0.6) {
+                    playerHit();
+                    return;
+                }
+            }
+
+            // Schüsse
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+
+                if (bullet.isPlayerBullet) {
+                    for (const enemy of enemies) {
+                        if (!enemy.isAlive) continue;
+                        const dx = Math.abs(bullet.x - (enemy.x + CELL_WIDTH / 2));
+                        const dy = Math.abs(bullet.y - (enemy.y + CELL_HEIGHT / 2));
+                        if (dx < CELL_WIDTH / 2 && dy < CELL_HEIGHT / 2) {
+                            enemy.isAlive = false;
+                            game.score += enemy.type.points;
+                            if (game.score > game.highScore) game.highScore = game.score;
+                            bullets.splice(i, 1);
+                            break;
+                        }
+                    }
+                } else {
+                    const dx = Math.abs(bullet.x - (player.x + CELL_WIDTH / 2));
+                    const dy = Math.abs(bullet.y - (player.y + CELL_HEIGHT / 2));
+                    if (dx < CELL_WIDTH / 2 && dy < CELL_HEIGHT / 2) {
+                        bullets.splice(i, 1);
+                        playerHit();
+                        return;
+                    }
+                }
+            }
+        }
+
+        function playerHit() {
+            game.lives--;
+            if (game.lives <= 0) {
+                game.isGameOver = true;
+                player.isAlive = false;
+            } else {
+                player.x = Math.floor(MAZE_WIDTH / 2) * CELL_WIDTH;
+                player.y = (MAZE_HEIGHT - 2) * CELL_HEIGHT;
+                player.direction = Direction.NONE;
+            }
+        }
+
+        function checkLevelComplete() {
+            const aliveEnemies = enemies.filter(e => e.isAlive).length;
+
+            // Spezielle Gegner spawnen
+            if (!game.worlukSpawned && aliveEnemies <= 2 && aliveEnemies > 0) {
+                spawnEnemy(EnemyType.WORLUK);
+                game.worlukSpawned = true;
+            }
+            if (!game.wizardSpawned && aliveEnemies === 1) {
+                spawnEnemy(EnemyType.WIZARD);
+                game.wizardSpawned = true;
+            }
+
+            if (aliveEnemies === 0) {
+                game.isLevelComplete = true;
+            }
+        }
+
+        function update() {
+            if (game.isGameOver || game.isLevelComplete || game.isPaused) return;
+
+            updatePlayer();
+            updateEnemies();
+            updateBullets();
+            checkCollisions();
+            checkLevelComplete();
+        }
+
+        function drawMaze() {
+            ctx.fillStyle = '#0000AA';
+            for (let y = 0; y < MAZE_HEIGHT; y++) {
+                for (let x = 0; x < MAZE_WIDTH; x++) {
+                    if (maze[y][x]) {
+                        ctx.fillRect(x * CELL_WIDTH, y * CELL_HEIGHT, CELL_WIDTH, CELL_HEIGHT);
+                    }
+                }
+            }
+
+            // Teleport-Türen
+            ctx.fillStyle = '#FF00FF';
+            const doorY = Math.floor(MAZE_HEIGHT / 2);
+            ctx.fillRect(0, doorY * CELL_HEIGHT, CELL_WIDTH / 2, CELL_HEIGHT);
+            ctx.fillRect(canvas.width - CELL_WIDTH / 2, doorY * CELL_HEIGHT, CELL_WIDTH / 2, CELL_HEIGHT);
+        }
+
+        function drawPlayer() {
+            if (!player.isAlive) return;
+
+            const centerX = player.x + CELL_WIDTH / 2;
+            const centerY = player.y + CELL_HEIGHT / 2;
+            const radius = Math.min(CELL_WIDTH, CELL_HEIGHT) / 3;
+
+            // Körper
+            ctx.fillStyle = '#FFFF00';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Richtungsanzeiger
+            ctx.fillStyle = '#FF0000';
+            let dirX = 0, dirY = 0;
+            const dir = player.direction !== Direction.NONE ? player.direction : player.lastDirection;
+            switch (dir) {
+                case Direction.UP: dirY = -radius * 0.7; break;
+                case Direction.DOWN: dirY = radius * 0.7; break;
+                case Direction.LEFT: dirX = -radius * 0.7; break;
+                case Direction.RIGHT: dirX = radius * 0.7; break;
+            }
+            ctx.beginPath();
+            ctx.arc(centerX + dirX, centerY + dirY, radius / 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawEnemies() {
+            for (const enemy of enemies) {
+                if (!enemy.isAlive) continue;
+
+                // Blinkend wenn unsichtbar
+                if (enemy.isInvisible && Math.floor(Date.now() / 200) % 2 === 0) continue;
+
+                const centerX = enemy.x + CELL_WIDTH / 2;
+                const centerY = enemy.y + CELL_HEIGHT / 2;
+                const radius = Math.min(CELL_WIDTH, CELL_HEIGHT) / 3;
+
+                ctx.fillStyle = enemy.type.color;
+
+                if (enemy.type === EnemyType.BURWOR) {
+                    // Kreis
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (enemy.type === EnemyType.GARWOR) {
+                    // Quadrat
+                    ctx.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+                } else if (enemy.type === EnemyType.THORWOR) {
+                    // Dreieck
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY - radius);
+                    ctx.lineTo(centerX - radius, centerY + radius);
+                    ctx.lineTo(centerX + radius, centerY + radius);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (enemy.type === EnemyType.WORLUK) {
+                    // Stern (Ring)
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (enemy.type === EnemyType.WIZARD) {
+                    // Wizard mit Augen
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius * 1.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(centerX - radius / 3, centerY - radius / 4, radius / 5, 0, Math.PI * 2);
+                    ctx.arc(centerX + radius / 3, centerY - radius / 4, radius / 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function drawBullets() {
+            ctx.fillStyle = '#FFFFFF';
+            for (const bullet of bullets) {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawUI() {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '20px Courier New';
+            ctx.fillText(`SCORE: ${game.score}`, 10, 25);
+            ctx.fillText(`LEVEL: ${game.level}`, canvas.width / 2 - 50, 25);
+            ctx.fillText(`LIVES: ${game.lives}`, canvas.width - 120, 25);
+            ctx.font = '16px Courier New';
+            ctx.fillText(`HIGH: ${game.highScore}`, 10, 45);
+        }
+
+        function drawGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#FF0000';
+            ctx.font = '48px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '24px Courier New';
+            ctx.fillText(`SCORE: ${game.score}`, canvas.width / 2, canvas.height / 2 + 40);
+            ctx.fillText('Drücke R zum Neustart', canvas.width / 2, canvas.height / 2 + 80);
+
+            ctx.textAlign = 'left';
+        }
+
+        function drawLevelComplete() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#00FF00';
+            ctx.font = '36px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(`LEVEL ${game.level} COMPLETE!`, canvas.width / 2, canvas.height / 2);
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '24px Courier New';
+            ctx.fillText('Drücke Leertaste für nächstes Level', canvas.width / 2, canvas.height / 2 + 50);
+
+            ctx.textAlign = 'left';
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawMaze();
+            drawPlayer();
+            drawEnemies();
+            drawBullets();
+            drawUI();
+
+            if (game.isGameOver) {
+                drawGameOver();
+            } else if (game.isLevelComplete) {
+                drawLevelComplete();
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event Listener
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (game.isLevelComplete) {
+                    nextLevel();
+                } else if (!game.isGameOver) {
+                    playerFire();
+                }
+            }
+
+            if (e.code === 'KeyR') {
+                restart();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Spiel starten
+        restart();
+        gameLoop();
+    </script>
+</body>
+</html>
