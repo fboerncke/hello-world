@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="maze_wall">#0000FF</color>
+    <color name="maze_floor">#000000</color>
+    <color name="player_color">#FFFF00</color>
+    <color name="enemy_burwor">#FF0000</color>
+    <color name="enemy_garwor">#00FFFF</color>
+    <color name="enemy_thorwor">#FF00FF</color>
+    <color name="wizard">#FFFFFF</color>
+    <color name="worluk">#00FF00</color>
+</resources>
