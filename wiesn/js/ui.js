@@ -266,6 +266,7 @@ G.ui = (function () {
     let y = 190;
     ctx.save(); ctx.beginPath(); ctx.rect(0, 170, W, H - 230); ctx.clip();
     if (pause.tab === 0) {
+      y -= pause.scroll * 56;
       for (const id of G.missions.order) {
         const m = G.missions.defs[id];
         const st = G.missions.done[id] ? '✔ geschafft' : (G.missions.active && G.missions.active.id === id) ? '▶ läuft gerade' : m.req() ? '● verfügbar – Symbol „' + m.letter + '“ auf der Karte' : '🔒 noch gesperrt';
@@ -318,8 +319,10 @@ G.ui = (function () {
         ['Spiel speichern', () => { G.game.save(); toast('Gespeichert!'); }],
         ['Zurück zum Titelbild', () => { G.game.save(); G.game.toTitle(); }],
       ];
+      y -= pause.scroll * 52;
       opts.forEach(([label, fn], i) => {
         const bx = x0, by = y + i * 52;
+        if (by < 170 || by + 42 > H - 60) return;
         ctx.fillStyle = pause.sel === i ? 'rgba(255,107,213,.5)' : 'rgba(255,255,255,.1)'; rrect(ctx, bx, by, Math.min(520, cw), 42, 8); ctx.fill();
         txt(ctx, label, bx + 16, by + 21, 16, '#fff', 'left', null);
         for (const c of clicks) if (c.x > bx && c.x < bx + 520 && c.y > by && c.y < by + 42) fn();
@@ -327,10 +330,17 @@ G.ui = (function () {
       });
       if (I.hit('down')) pause.sel = Math.min(opts.length - 1, pause.sel + 1);
       if (I.hit('up')) pause.sel = Math.max(0, pause.sel - 1);
+      if (I.hit('down') || I.hit('up')) { const vis = Math.max(1, Math.floor((H - 60 - 190) / 52)); pause.scroll = Math.max(0, pause.sel - vis + 1); }
     }
     ctx.restore();
     txt(ctx, 'Weiterspielen: Esc / P   (oder hier tippen)', W / 2, H - 28, 15, '#7fff9a', 'center', '#000', 3);
-    for (const c of clicks) if (c.y > H - 50) G.game.togglePause();
+    // Blättern per Antippen (für Touch)
+    const ax = W - 34;
+    for (const [lbl, yy, d] of [['▲', 200, -1], ['▼', H - 90, 1]]) {
+      circle(ctx, ax, yy, 20, 'rgba(255,255,255,.18)'); txt(ctx, lbl, ax, yy + 1, 16, '#fff', 'center', null);
+      for (const c of clicks) if (Math.hypot(c.x - ax, c.y - yy) < 26) pause.scroll = Math.max(0, pause.scroll + d);
+    }
+    for (const c of clicks) if (c.y > H - 50 && Math.abs(c.x - W / 2) < 230) G.game.togglePause();
   }
 
   // ---------- Logo im GTA-VI-Stil ----------

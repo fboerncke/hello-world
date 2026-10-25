@@ -73,7 +73,7 @@
         localStorage.setItem(SAVE_KEY, JSON.stringify({
           name: P.name, female: P.female, taler: game.taler, gaudi: game.gaudi, day: game.day, clock: game.clock,
           done: G.missions.done, hearts: game.hearts.map(h => h.got), facts: [...game.facts], wearsHeart: P.wearsHeart,
-          x: P.x, y: P.y, speech: A.speech, easy: G.settings.easy, oideSeen: game.oideSeen, ozapft: game.ozapft, brezn: !!G.flags.brezn, trophies: G.trophies.save(), plush: !!P.plush,
+          x: P.x, y: P.y, speech: A.speech, easy: G.settings.easy, oideSeen: game.oideSeen, ozapft: game.ozapft, brezn: !!G.flags.brezn, flags: G.flags, trophies: G.trophies.save(), plush: !!P.plush,
         }));
       } catch (e) { /* Speichern nicht möglich */ }
     },
@@ -84,7 +84,15 @@
   const isFamilyDay = () => DAYS[(game.day - 1) % 7] === 'Dienstag' && game.clock < 1140;
   const price = (p) => (isFamilyDay() ? Math.ceil(p / 2) : p);
 
+  // Beendet laufende Fahrten/Autoscooter, ohne Belohnung (Tageswechsel, Erwischt, neues Spiel)
+  function clearTransient() {
+    if (game.scooter) { game.scooter = null; }
+    if (game.ride) { if (game.ride.music) A.setStation(savedStation); game.ride = null; }
+    P.hidden = false;
+    if (P.vehicle) { P.vehicle.v = 0; P.vehicle = null; }
+  }
   function resetWorld() {
+    clearTransient();
     E.spawnCrowd(); E.spawnRollers();
     game.hearts = WD.heartSpots.map(([x, y], i) => ({ x, y, got: false, fact: G.HEART_FACTS[i % G.HEART_FACTS.length] }));
     game.chasers = []; game.heat = 0; game.stars = 0;
@@ -112,7 +120,7 @@
     (s.hearts || []).forEach((g, i) => { if (game.hearts[i]) game.hearts[i].got = g; });
     if (s.speech !== undefined) A.speech = s.speech;
     G.settings.easy = !!s.easy;
-    game.oideSeen = !!s.oideSeen; game.ozapft = !!s.ozapft; G.flags.brezn = !!s.brezn;
+    game.oideSeen = !!s.oideSeen; game.ozapft = !!s.ozapft; G.flags = Object.assign({}, s.flags || {}); G.flags.brezn = !!s.brezn;
     G.trophies.load(s.trophies); G.events.reset(); P.plush = !!s.plush;
     if (WD.solidAt(P.x, P.y, 9)) { P.x = 2240; P.y = 240; }
     startLoading(() => {
@@ -367,7 +375,7 @@
   function endBusted() {
     game.scene = 'world'; game.busted = null;
     game.chasers = []; game.heat = 0; game.stars = 0;
-    if (P.vehicle) { P.vehicle.v = 0; P.vehicle = null; }
+    clearTransient();
     P.x = WD.places.service.x; P.y = WD.places.service.y + 20;
     const lost = Math.min(3, game.taler); game.taler -= lost;
     G.ui.dialog([
@@ -428,7 +436,7 @@
     if (game.clock >= 1200 && !G.ui.dialogOpen) {
       game.clock = 1200;
       if (G.missions.active && G.missions.active.id !== 'finale') G.missions.abort();
-      if (P.vehicle) { P.vehicle.v = 0; P.vehicle = null; }
+      clearTransient();
       game.unlockFact('20uhr');
       G.ui.dialog([
         { who: 'Oma Resi', text: 'Es is 20 Uhr! Ab jetzt dürfen Kinder unter 16 nur no mit Erwachsenen auf der Festwiese bleiben.' },
@@ -457,7 +465,7 @@
       G.missions.update(dt);
       const it = findInteraction();
       G.ui.prompt = it && !game.ride ? it.label() : null;
-      if (it && it.act && I.hit('act')) { it.act(); G.ui.prompt = null; }
+      if (it && it.act && I.hit('act') && !G.ui.dialogOpen && game.scene === 'world') { it.act(); G.ui.prompt = null; }
       if (I.hit('map')) game.map = true;
       if (I.hit('radio')) { A.nextStation(); G.ui.showRadio(); }
       if (I.hit('back') || I.hit('pause')) game.togglePause();

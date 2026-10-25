@@ -75,7 +75,7 @@ G.missions = (function () {
         { who: 'Oma Resi', text: 'Weißt du, die erste Wiesn war 1810. Da hat der Kronprinz Ludwig seine Therese geheiratet – drum heißt des hier Theresienwiese.' },
         { who: 'Oma Resi', text: 'Und wennst di verlierst: Treffpunkt is des Servicezentrum hinterm Schottenhamel. Merk dir des!' },
         { who: 'Oma Resi', text: 'Hier hast 20 Taler. Kauf dir erst amoi a Brezn – a Wiesn ohne Brezn geht gar ned!' },
-      ], () => { G.game.addTaler(20); G.game.unlockFact('f1810'); G.game.unlockFact('service'); }),
+      ], () => { if (!G.flags.pocketMoney) { G.flags.pocketMoney = true; G.game.addTaler(20); } G.game.unlockFact('f1810'); G.game.unlockFact('service'); }),
       cond('Kauf dir eine Brezn am Brezn-Standl.', () => G.flags.brezn, () => G.world.places.brezn),
       dlg([{ who: 'Oma Resi', text: 'Guad, gell? So, und jetzt schnapp dir an Roller – damit bist schneller unterwegs. Zum Aufsteigen [E] drücken!' }]),
       cond('Schnapp dir einen Roller (Roller-Symbol auf der Karte) und steig mit [E] auf.', () => G.player.vehicle && G.player.vehicle.type === 'roller', () => G.game.nearestRoller()),
@@ -211,7 +211,8 @@ G.missions = (function () {
   });
 
   // ================= Steuerung =================
-  function available() { return order.filter(id => !done[id] && (!active || active.id !== id) && defs[id].req()); }
+  // Während einer laufenden Mission werden keine weiteren angeboten
+  function available() { return active ? [] : order.filter(id => !done[id] && defs[id].req()); }
 
   function begin(id) {
     active = defs[id]; step = 0; sd = {};
