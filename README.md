@@ -1,3 +1,6 @@
+> **Neu:** [GTA Wiesn](wiesn/) – ein kinderfreundliches Oktoberfest-Abenteuer im GTA-Stil für den Browser.
+> Einfach `wiesn/index.html` öffnen. Details in [wiesn/README.md](wiesn/README.md).
+
 # Wizard of Wor - Android Game
 
 Ein Android-Spiel inspiriert vom klassischen Arcade-Spiel "Wizard of Wor" (1981).
