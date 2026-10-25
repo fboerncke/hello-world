@@ -248,6 +248,18 @@ G.ent = (function () {
     for (const t of G.world.tents) {
       const p = newNPC('adult'); p.x = t.door.x + rand(-60, 60); p.y = t.door.y + rand(0, 20); p.idle = true; p.moving = false; npcs.push(p);
     }
+    // Schaulustige und Wartende vor den Fahrgeschäften
+    const P = G.world.places;
+    for (const k of ['toboggan', 'teufelsrad', 'riesenrad', 'wellenflug', 'autoscooter', 'schichtl', 'looping', 'krinoline', 'lukas', 'dosen', 'schaukel', 'kalb']) {
+      const pl = P[k]; if (!pl) continue;
+      for (let i = 0; i < 3; i++) {
+        const q = newNPC(Math.random() < 0.4 ? 'kid' : 'adult');
+        q.x = pl.x + (i - 1) * 26 + rand(-6, 6) + (i === 1 ? 46 : 0); q.y = pl.y + 14 + rand(0, 26);
+        if (G.world.solidAt(q.x, q.y, 6)) continue;
+        q.idle = true; q.moving = false; q.dir = -Math.PI / 2;
+        npcs.push(q);
+      }
+    }
     // Blaskapelle zieht über die Wiesn
     band.length = 0;
     const route = [[2240, 300], [2240, 1810], [1380, 1810], [1380, 170], [2240, 170]];
