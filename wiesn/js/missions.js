@@ -265,6 +265,7 @@ G.missions = (function () {
     defs, order, done, available, begin, update, currentTarget, currentStep,
     get active() { return active; }, get sd() { return sd; },
     abort() { if (active) fail(); },
+    add: def,
     reset() { for (const k in done) delete done[k]; active = null; },
   };
 })();

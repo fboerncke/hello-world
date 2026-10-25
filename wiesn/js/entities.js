@@ -126,6 +126,11 @@ G.ent = (function () {
     } else if (p.carry === 'brezn') {
       G.world.drawBrezn(ctx, side >= 0 ? 9 : -9, -18, 4);
     }
+    if (p.plush) {
+      const sx = side >= 0 ? -9 : 9;
+      circle(ctx, sx, -18, 4.5, '#b8743a'); circle(ctx, sx, -24, 3.5, '#b8743a'); circle(ctx, sx - 2.5, -27, 1.5, '#b8743a'); circle(ctx, sx + 2.5, -27, 1.5, '#b8743a');
+      circle(ctx, sx, -18, 2, '#e8c8a0');
+    }
     if (p.wearsHeart) {
       ctx.strokeStyle = '#f2e6c8'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-4, -28); ctx.lineTo(0, -21); ctx.lineTo(4, -28); ctx.stroke();
       if (!back) G.world.drawHeart(ctx, 0, -19, 4.5, '#e84d8a');

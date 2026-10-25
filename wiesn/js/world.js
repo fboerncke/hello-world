@@ -178,7 +178,7 @@ G.world = (function () {
   const heartSpots = [
     [700, 300], [1240, 470], [930, 860], [1350, 1000], [690, 1640], [480, 1160],
     [180, 1000], [2120, 820], [2380, 1000], [2830, 700], [3040, 1500], [2870, 1880],
-    [2120, 1860], [1530, 1500], [880, 2240], [2200, 2230], [1460, 2070], [1600, 160],
+    [2120, 1860], [1530, 1500], [1500, 2265], [2200, 2230], [1460, 2070], [1600, 160],
   ];
 
   // ---------- Kollision ----------
@@ -1024,6 +1024,7 @@ G.world = (function () {
   }
 
   function drawObject(ctx, o, t, dark) {
+    if (o.draw) return o.draw(ctx, t, dark);
     switch (o.kind) {
       case 'tent': drawTent(ctx, o, t); break;
       case 'service': drawService(ctx, o); break;
@@ -1049,6 +1050,7 @@ G.world = (function () {
 
   // Grobe Ausdehnung für das Culling
   function objBounds(o) {
+    if (o.bounds) return o.bounds;
     switch (o.kind) {
       case 'riesenrad': return [o.x - 190, o.y - 400, 380, 480];
       case 'toboggan': return [o.x - 30, o.y - 320, o.w + 60, o.h + 330];
@@ -1093,6 +1095,7 @@ G.world = (function () {
     c.fillStyle = '#ddd'; c.beginPath(); c.arc(1010, 340, 70, 0, TAU); c.fill();
     c.fillStyle = '#cfc6b0'; c.fillRect(140, 720, 440, 70); c.fillRect(140, 790, 60, 170); c.fillRect(520, 790, 60, 170);
     c.fillStyle = '#9a7a40'; c.fillRect(325, 945, 70, 55);
+    if (G.world.miniHook) G.world.miniHook(c);
     return miniCanvas;
   }
 

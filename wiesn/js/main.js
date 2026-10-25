@@ -44,7 +44,7 @@
       if (f) G.ui.toast('♥ Neues Wiesn-Wissen: „' + f.title + '“ (Pause → Wiesn-Wissen)', 4);
     },
     addHeat(n) {
-      if (game.scene !== 'world' || game.scooter) return;
+      if (game.scene !== 'world' || game.scooter || G.events.noHeat) return;
       game.heat = Math.min(15, game.heat + n); game.lastBump = G.time;
       const before = game.stars; updateStars();
       if (game.stars > before) {
@@ -65,6 +65,7 @@
       if (name === 'schichtl') G.schichtl.start(done); else G[name].start(opts, done);
     },
     startCredits(cb) { game.scene = 'credits'; game.credits = { t: 0, cb }; A.sfx.boeller(); setTimeout(() => A.sfx.boeller(), 900); setTimeout(() => A.sfx.boeller(), 1800); A.say('Servus, und bis zur nächsten Wiesn!'); },
+    photo() { game.paused = false; game.photoPending = 2; },
     togglePause() { game.paused = !game.paused; G.ui.pause.sel = 0; if (game.paused && window.speechSynthesis) speechSynthesis.cancel(); },
     toTitle() { game.paused = false; game.scene = 'title'; game.titleSel = 0; },
     save() {
@@ -72,7 +73,7 @@
         localStorage.setItem(SAVE_KEY, JSON.stringify({
           name: P.name, female: P.female, taler: game.taler, gaudi: game.gaudi, day: game.day, clock: game.clock,
           done: G.missions.done, hearts: game.hearts.map(h => h.got), facts: [...game.facts], wearsHeart: P.wearsHeart,
-          x: P.x, y: P.y, speech: A.speech, oideSeen: game.oideSeen, ozapft: game.ozapft, brezn: !!G.flags.brezn,
+          x: P.x, y: P.y, speech: A.speech, oideSeen: game.oideSeen, ozapft: game.ozapft, brezn: !!G.flags.brezn, trophies: G.trophies.save(), plush: !!P.plush,
         }));
       } catch (e) { /* Speichern nicht möglich */ }
     },
@@ -97,6 +98,7 @@
     P.x = 2240; P.y = 240; P.energy = 100; P.stamina = 100; P.wearsHeart = false;
     game.taler = 0; game.gaudi = 0; game.day = 1; game.clock = 600; game.facts = new Set(); G.flags = {};
     game.oideSeen = false; game.ozapft = false;
+    G.trophies.load(null); G.events.reset(); P.plush = false;
     startLoading(() => { game.scene = 'world'; G.missions.begin('servus'); });
   }
   function continueGame(s) {
@@ -110,6 +112,7 @@
     (s.hearts || []).forEach((g, i) => { if (game.hearts[i]) game.hearts[i].got = g; });
     if (s.speech !== undefined) A.speech = s.speech;
     game.oideSeen = !!s.oideSeen; game.ozapft = !!s.ozapft; G.flags.brezn = !!s.brezn;
+    G.trophies.load(s.trophies); G.events.reset(); P.plush = !!s.plush;
     if (WD.solidAt(P.x, P.y, 9)) { P.x = 2240; P.y = 240; }
     startLoading(() => {
       game.scene = 'world';
@@ -140,12 +143,33 @@
       go(0);
     }, () => !G.missions.active || !['teufelsrad', 'finale'].includes(G.missions.active.id));
     R('riesenrad', () => 'Riesenrad fahren (' + price(4) + ' Taler)', () => { if (!pay(4)) return; startView('riesenrad'); });
-    R('wellenflug', () => 'Wellenflug fahren (' + price(3) + ' Taler)', () => { if (!pay(3)) return; startRide(WD.wellenflug, 'WELLENFLUG', 'Im Kettenkarussell fliegst du im Kreis – wie ein Vogel über der Wiesn!', 9); });
-    R('krinoline', () => 'Krinoline fahren (' + price(2) + ' Taler)', () => { if (!pay(2)) return; startRide(WD.krinoline, 'KRINOLINE', 'Mit echter Blaskapelle in der Mitte – eines der ältesten Karussells der Wiesn!', 11, true); game.unlockFact('krino'); });
+    R('wellenflug', () => 'Wellenflug fahren (' + price(3) + ' Taler)', () => { if (!pay(3)) return; startRide(WD.wellenflug, 'WELLENFLUG', 'Im Kettenkarussell fliegst du im Kreis – wie ein Vogel über der Wiesn!', 9); G.trophies.ride('wellenflug'); });
+    R('krinoline', () => 'Krinoline fahren (' + price(2) + ' Taler)', () => { if (!pay(2)) return; startRide(WD.krinoline, 'KRINOLINE', 'Mit echter Blaskapelle in der Mitte – eines der ältesten Karussells der Wiesn!', 11, true); game.unlockFact('krino'); G.trophies.ride('krinoline'); });
     R('autoscooter', () => 'Autoscooter fahren (' + price(3) + ' Taler)', () => { if (!pay(3)) return; startScooter(); });
     R('schichtl', () => 'Zum Schichtl (' + price(3) + ' Taler)', () => { if (!pay(3)) return; game.unlockFact('schichtl'); game.startMinigame('schichtl', null, () => game.addGaudi(5)); });
     R('looping', () => 'Olympia-Looping', () => { game.unlockFact('looping'); G.ui.dialog([{ who: 'Kassiererin', text: 'Fünf Loopings, 1.250 Meter Strecke – die größte transportable Achterbahn der Welt! Aber du bist no a bisserl z’klein dafür. Komm in a paar Jahr wieder!' }]); });
     R('bavaria', () => 'In die Bavaria hinaufsteigen', () => { game.unlockFact('bavaria'); startView('bavaria'); });
+    R('lukas', () => 'Hau den Lukas (' + price(2) + ' Taler)', () => {
+      if (!pay(2)) return; game.unlockFact('lukas');
+      game.startMinigame('lukas', {}, (res) => { if (res.bell) { G.trophies.unlock('lukas'); game.addTaler(5); G.ui.toast('DING! Die Glocke hat geläutet – +5 Taler', 3); } game.addGaudi(3); });
+    });
+    R('dosen', () => 'Dosenwerfen (' + price(3) + ' Taler)', () => {
+      if (!pay(3)) return; game.unlockFact('dosen');
+      game.startMinigame('dosen', {}, (res) => { if (res.win) { P.plush = true; G.trophies.unlock('dosen'); G.ui.toast('Du trägst jetzt einen Teddy unterm Arm!', 3); } game.addGaudi(3); });
+    });
+    R('schaukel', () => 'Schiffschaukel fahren (' + price(2) + ' Taler)', () => {
+      if (!pay(2)) return; game.unlockFact('schaukel');
+      game.startMinigame('schaukel', {}, (res) => { G.trophies.ride('schaukel'); if (res.top) G.trophies.unlock('schaukel'); game.addGaudi(4); });
+    });
+    R('kalb', () => 'Kettenflieger Kalb fahren (' + price(2) + ' Taler)', () => { if (!pay(2)) return; game.unlockFact('kalb'); startRide(WD.objects.find(o => o.kind === 'kalb'), 'KETTENFLIEGER KALB', 'Dieser Kettenflieger dreht sich schon seit 1919 – über 100 Jahre!', 9); G.trophies.ride('kalb'); });
+    R('museum', () => 'Ins Museumszelt schauen', () => {
+      game.unlockFact('museum');
+      G.ui.dialog([
+        { who: 'Museumsführerin', text: 'Grüß dich! Hier im Museumszelt der Oidn Wiesn zeigen wir, wie das Oktoberfest früher war.' },
+        { who: 'Museumsführerin', text: 'Schau, das ist ein Nachbau vom Velodrom. Auf den Hochrädern dürfen Kinder sogar selbst eine Runde drehen!' },
+        { who: 'Museumsführerin', text: 'Und weißt du, warum’s Wiesn heißt? Weil 1810 auf dieser Wiese die Hochzeit von Ludwig und Therese gefeiert wurde – mit einem Pferderennen!' },
+      ]);
+    });
     interact.push({ x: WD.places.service.x, y: WD.places.service.y, r: 46, foot: true, label: () => 'Oma im Servicezentrum besuchen', act: () => {
       if (game.taler < 3) { game.addTaler(10); G.ui.dialog([{ who: 'Oma Resi', text: 'Na, is’s Geld scho alle? Do hast no a bisserl Taschengeld – 10 Taler. Aber ned alles für Zuckerwatte ausgeben!' }]); }
       else G.ui.dialog([{ who: 'Oma Resi', text: pick(['I sitz hier und rast mi a bisserl aus. Geh nur, schau dir die Wiesn an!', 'Hast scho de versteckten Lebkuchenherzen gfunden? Do steckt a Haufen Wiesn-Wissen drin!', 'Um 20 Uhr gehn mir hoam, gell? Dann dürfen Kinder nur no mit Erwachsenen auf d’Festwiese.']) }]);
@@ -166,6 +190,7 @@
     if (!pay(s.price)) return;
     game.unlockFact('schmankerl');
     const kind = s.id.replace(/\d/, '');
+    G.trophies.ate(kind);
     switch (kind) {
       case 'brezn': P.energy = Math.min(100, P.energy + 35); G.flags.brezn = true; G.ui.toast('Mmmh, a frische Brezn! (+Energie)'); break;
       case 'mandeln': P.boost = 25; P.boostKind = 'mandeln'; G.ui.toast('Gebrannte Mandeln – süß und knusprig! Du bist jetzt schneller.'); break;
@@ -179,7 +204,7 @@
     if (game.taler < 5) { G.ui.dialog([{ who: 'Bedienung', text: t.info + ' Für a Brotzeit brauchst 5 Taler.' }]); return; }
     game.taler -= 5; A.sfx.coin(); P.energy = 100;
     if (t.id === 'schottenhamel') game.unlockFact('ozapft');
-    G.ui.dialog([{ who: 'Bedienung', text: t.info }, { who: 'Bedienung', text: 'Do hast a halbe Hendl und a Spezi. An Guadn! (Energie voll)' }]);
+    game.startMinigame('zelt', { tent: t }, () => { G.ui.toast('Energie voll – a halbe Hendl und a Spezi!', 3); });
   }
 
   // ---------- Fahrgeschäfte (in der Welt) ----------
@@ -199,6 +224,7 @@
     const a = WD.autoscooter;
     game.scooter = { t: 40, bumps: 0, v: { type: 'scooter', x: a.x + a.w / 2, y: a.y + a.h / 2, a: -Math.PI / 2, v: 0, col: '#ffe100' } };
     P.vehicle = game.scooter.v;
+    G.trophies.ride('autoscooter');
     G.ui.toast('Autoscooter! Rempeln ist hier ausdrücklich erlaubt. [E] zum Aussteigen', 4);
   }
   function endScooter() {
@@ -212,7 +238,7 @@
       ? ['RIESENRAD', 'Rund 50 Meter über der Theresienwiese', 'Links die Schaustellerstraße, rechts die Wirtsbudenstraße mit den großen Festzelten.', 'Im Westen steht die Bavaria vor der Ruhmeshalle – und ganz im Süden die Oide Wiesn.']
       : ['DIE BAVARIA', 'Blick aus dem Kopf der Bronzestatue', 'Die Bavaria hält einen Eichenkranz hoch – neben ihr sitzt ein Löwe.', 'Am letzten Wiesn-Sonntag knallen hier die Böllerschützen zum Abschluss!'];
     game.scene = 'view'; game.view = { kind, t: 0, dur: 15, lines };
-    if (kind === 'riesenrad') game.unlockFact('riesenrad'); else game.unlockFact('boeller');
+    if (kind === 'riesenrad') { game.unlockFact('riesenrad'); G.trophies.unlock('riesenrad'); G.trophies.ride('riesenrad'); } else game.unlockFact('boeller');
     A.sfx.whoosh(1.5);
   }
 
@@ -288,6 +314,8 @@
   function findInteraction() {
     nearest = null; let bd = 1e9; let label = null;
     if (game.ride || game.scooter) return null;
+    for (const it of G.events.interactions()) { const d = dist(P.x, P.y, it.x, it.y); if (d < it.r && d < bd) { bd = d; nearest = it; } }
+    if (nearest) return nearest;
     // Auftraggeber
     for (const id of G.missions.available()) {
       const m = G.missions.defs[id];
@@ -332,6 +360,7 @@
   function startBusted() {
     game.scene = 'busted'; game.busted = { t: 0 };
     A.sfx.busted(); A.say('Erwischt!', 0.8);
+    G.trophies.unlock('erwischt');
   }
   function endBusted() {
     game.scene = 'world'; game.busted = null;
@@ -368,7 +397,7 @@
       if (d0.nextSniff <= 0) { d0.sniff = 1.3; d0.nextSniff = rand(3, 5); d0.say = pick(['*schnüffel*', 'Wuff!', '*schnupper*']); d0.sayT = 1.2; }
     }
     if (d0.sayT > 0) { d0.sayT -= dt; if (d0.sayT <= 0) d0.say = null; }
-    if (d < 22) { d0.caught = true; A.sfx.boing(); G.ui.toast(P.name + ': „Hab di, Waldi!“ – Wuff!', 3); }
+    if (d < 22) { d0.caught = true; A.sfx.boing(); G.trophies.unlock('waldi'); G.ui.toast(P.name + ': „Hab di, Waldi!“ – Wuff!', 3); }
   }
 
   function updateHearts() {
@@ -380,7 +409,7 @@
         const got = game.hearts.filter(x => x.got).length;
         game.facts.add(h.fact);
         G.ui.big('LEBKUCHENHERZ ' + got + '/' + game.hearts.length, f ? f.title + ': ' + f.text : '', 6, '#ff8ac0');
-        if (got === game.hearts.length) setTimeout(() => { G.ui.big('ALLE HERZEN GEFUNDEN!', 'Du bist ein echter Wiesn-Kenner! +50 Taler', 5); game.addTaler(50); }, 6500);
+        if (got === game.hearts.length) setTimeout(() => { G.trophies.unlock('herzen'); G.ui.big('ALLE HERZEN GEFUNDEN!', 'Du bist ein echter Wiesn-Kenner! +50 Taler', 5); game.addTaler(50); }, 6500);
         game.save();
       }
     }
@@ -389,9 +418,10 @@
   function updateClock(dt) {
     game.clock += dt * 0.5;
     if (!game.ozapft && game.day === 1 && game.clock >= 720) {
-      game.ozapft = true; A.sfx.boeller(); setTimeout(() => A.sfx.boeller(), 600);
-      G.ui.big('O’ZAPFT IS!', '12 Uhr: Im Schottenhamel wurde das erste Fass angezapft – die Wiesn ist eröffnet!', 5);
-      game.facts.add('ozapft');
+      game.ozapft = true;
+      for (let i = 0; i < 12; i++) setTimeout(() => A.sfx.boeller(), 900 + i * 420);
+      G.ui.big('O’ZAPFT IS!', '12 Uhr: Im Schottenhamel ist das erste Fass angezapft. Hörst du? Zwölf Böllerschüsse an der Bavaria – das Signal für alle Zelte!', 7);
+      game.facts.add('ozapft'); game.facts.add('zwoelf');
     }
     if (game.clock >= 1200 && !G.ui.dialogOpen) {
       game.clock = 1200;
@@ -413,7 +443,7 @@
 
   function updateWorld(dt, dlgWasOpen) {
     const blocking = G.ui.dialogOpen || dlgWasOpen;
-    if (!blocking) updatePlayer(dt);
+    if (!blocking) { updatePlayer(dt); G.events.update(dt); }
     else { P.moving = false; if (P.vehicle) P.vehicle.v *= 0.9; }
     E.updateNPCs(dt, P);
     E.updateCarriage(dt, P);
@@ -509,6 +539,8 @@
     if (G.dog) items.push({ y: G.dog.y, k: 5, o: G.dog });
     for (const h of game.hearts) if (!h.got && inView(h.x - 20, h.y - 50, 40, 60)) items.push({ y: h.y, k: 6, o: h });
     if (!P.hidden && game.scene !== 'credits') items.push({ y: P.y, k: 7, o: P });
+    G.events.drawRaceGround(ctx);
+    for (const d of G.events.drawables(inView)) items.push({ y: d.y, k: 8, o: d });
     items.sort((a, b) => a.y - b.y);
     if (tgt && !P.hidden) drawMarkerGround(tgt);
     for (const it of items) {
@@ -521,6 +553,7 @@
         case 5: E.drawDog(ctx, it.o); break;
         case 6: { const h = it.o; const b = Math.sin(t * 3 + h.x) * 4; ellipse(ctx, h.x, h.y, 10, 4, 'rgba(0,0,0,.25)'); circle(ctx, h.x, h.y - 22 + b, 18, 'rgba(255,150,200,.25)'); WD.drawHeart(ctx, h.x, h.y - 22 + b, 11, '#e84d8a'); break; }
         case 7: drawPlayer(); break;
+        case 8: it.o.draw(ctx); break;
       }
     }
     if (tgt && !P.hidden) drawMarker(tgt.x, tgt.y);
@@ -573,6 +606,29 @@
       ctx.fillStyle = '#ffe46b'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(P.x - 5, by - 6); ctx.lineTo(P.x + 5, by - 6); ctx.lineTo(P.x, by); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+  }
+
+  // ---------- Wiesn-Postkarte ----------
+  function makePostcard() {
+    const pc = document.createElement('canvas'); pc.width = 1200; pc.height = 820;
+    const c = pc.getContext('2d');
+    c.fillStyle = '#fff8e6'; c.fillRect(0, 0, 1200, 820);
+    const sw = cv.width, sh = cv.height, ar = 1100 / 600;
+    let cw2 = sw, ch2 = sw / ar; if (ch2 > sh) { ch2 = sh; cw2 = sh * ar; }
+    c.drawImage(cv, (sw - cw2) / 2, (sh - ch2) / 2, cw2, ch2, 50, 50, 1100, 600);
+    c.strokeStyle = '#1a7fd4'; c.lineWidth = 6; c.strokeRect(50, 50, 1100, 600);
+    rauten(c, 0, 0, 1200, 22, 12); rauten(c, 0, 798, 1200, 22, 12);
+    G.ui.drawLogo(c, 140, 715, 0.42);
+    txt(c, 'Servus von der Wiesn!', 690, 705, 46, '#d6336c', 'center', '#fff', 6);
+    txt(c, P.name + ' · ' + DAYS[(game.day - 1) % 7] + ', Tag ' + game.day + ' · ' + fmtTime(game.clock) + ' Uhr · Theresienwiese', 690, 760, 20, '#5a3418', 'center', null);
+    G.world.drawHeart(c, 1110, 720, 30, '#e84d8a', 'Wiesn');
+    const a = document.createElement('a');
+    a.download = 'wiesn-postkarte-tag' + game.day + '.png';
+    a.href = pc.toDataURL('image/png');
+    document.body.appendChild(a); a.click(); a.remove();
+    A.sfx.whoosh(0.2); A.sfx.bell();
+    G.ui.big('KLICK!', 'Deine Wiesn-Postkarte wurde gespeichert.', 2.5, '#fff');
+    G.lastPostcard = a.href;
   }
 
   // ---------- Titel / Figurenwahl / Laden ----------
@@ -730,6 +786,7 @@
     if (c.t > 3) txt(ctx, '[E] überspringen', W - 20, 24, 12, 'rgba(255,255,255,.7)', 'right', null);
     if (y0 + CREDITS.length * lh < -40 || (c.t > 3 && I.hit('act'))) {
       game.scene = 'world'; game.credits = null; game.clock = 1150;
+      G.trophies.unlock('legende');
       G.ui.big('WIESN-LEGENDE!', 'Du hast alle Missionen geschafft! Die Wiesn gehört dir – sammle noch alle Lebkuchenherzen!', 6);
       c.cb();
     }
@@ -795,6 +852,7 @@
           if (game.scene !== 'world') break;
           renderWorld(ctx);
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          if (game.photoPending && --game.photoPending === 0) makePostcard();
           if (game.ride) {
             txt(ctx, game.ride.title, W / 2, H * 0.18, Math.min(48, W / 12), '#ffd84a', 'center', '#000', 8);
             ctx.font = '700 18px ' + FONT;
@@ -803,6 +861,7 @@
           }
           if (game.scooter) txt(ctx, 'AUTOSCOOTER  ⏱ ' + Math.ceil(game.scooter.t) + ' s   Rempler: ' + game.scooter.bumps, W / 2, 70, 20, '#ffe100', 'center', '#000', 5);
           G.ui.drawHUD(ctx, W, H);
+          G.events.drawHUD(ctx, W, H);
           G.ui.drawToasts(ctx, W, H);
           G.ui.drawCards(ctx, W, H);
           G.ui.drawDialog(ctx, W, H);

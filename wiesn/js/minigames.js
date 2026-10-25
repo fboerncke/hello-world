@@ -100,7 +100,7 @@ G.toboggan = (function () {
       return;
     }
     if (st.phase === 'belt') {
-      const easy = st.falls >= 4 ? 0.75 : 1;
+      const easy = (st.falls >= 4 ? 0.75 : 1) * (st.helper ? 0.6 : 1);
       const vb = 1.15 * easy * (st.crawl ? 0.8 : 1);
       st.crawl = st.crawlUnlocked && I.down('down');
       // instabiles Gleichgewicht (umgedrehtes Pendel)
@@ -125,7 +125,9 @@ G.toboggan = (function () {
         st.fallFrom = st.s; st.laugh = 1; st.laughs += randi(15, 40);
         G.audio.sfx.laugh(6); G.audio.sfx.boing();
         for (let k = 0; k < 4; k++) bubble(pick(LAUGHS), rand(80, 880), rand(380, 450), '#ffe46b');
-        if (st.falls === 2) { st.crawlUnlocked = true; st.msg = 'Tipp: Halte ↓ zum KRABBELN – so schaffen es viele!'; st.msgT = 5; }
+        if (st.falls === 3) { st.helper = true; G.audio.say('Komm, i halt di an da Hand!'); }
+        if (st.falls === 3) { st.msg = 'Ein Toboggan-Helfer hält dich jetzt an der Hand – so wie die echten Helfer bei Kindern!'; st.msgT = 5; }
+        else if (st.falls === 2) { st.crawlUnlocked = true; st.msg = 'Tipp: Halte ↓ zum KRABBELN – so schaffen es viele!'; st.msgT = 5; }
         else { st.msg = 'Toboggan-Toni: „' + pick(TONI) + '“'; st.msgT = 3; }
         G.audio.say(pick(['Hoppala!', 'Jetzt hat’s di!', 'Nochmal!']));
       }
@@ -149,7 +151,7 @@ G.toboggan = (function () {
       if (I.hit('left')) k = 'L'; if (I.hit('right')) k = 'R';
       if (I.hit('act') || I.hit('space')) k = st.lastKey === 'L' ? 'R' : 'L';
       if (k && k !== st.lastKey) { st.steps++; st.lastKey = k; G.audio.sfx.step(); }
-      if (st.steps >= 26) { st.phase = 'top'; st.pt = 0; G.audio.say('Oben! Jetzt auf die Matte und runter!'); }
+      if (st.steps >= 26) { st.phase = 'top'; st.pt = 0; G.audio.say('Oben! Jetzt auf die Kokosmatte und runter!'); G.game.unlockFact('tobmatte'); }
       return;
     }
     if (st.phase === 'top') {
@@ -234,6 +236,12 @@ G.toboggan = (function () {
     drawTower(ctx);
     // Spieler
     const p = beltPos(st.s);
+    if (st.helper && st.phase !== 'fall') {
+      const hp = beltPos(Math.max(0, st.s - 0.9));
+      drawSideKid(ctx, hp.x, hp.y - 12, 0, { female: false, skin: '#e8b48a', hair: '#1a1a1a', shirt: '#2a2a2a' }, { scale: 1.9, arm: 0.9, legSw: Math.sin(t * 12) * 2.5 });
+      ctx.strokeStyle = '#e8b48a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hp.x + 16, hp.y - 60); ctx.lineTo(p.x - 8, p.y - 62); ctx.stroke();
+      txt(ctx, 'Helfer', hp.x, hp.y + 20, 11, '#fff', 'center', '#000', 3);
+    }
     if (st.phase === 'fall') {
       const rot = st.pt * 9 * (st.fallDir || -1);
       drawSideKid(ctx, p.x, p.y - 14 - Math.sin(st.pt * 6) * 10, rot, st.look, { mouth: 'o', arm: Math.sin(st.pt * 20) * 1.5, legSw: 4 });
@@ -295,7 +303,7 @@ G.toboggan = (function () {
     if (st.phase === 'top') {
       ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 0, VW, VH);
       txt(ctx, 'OBEN!', VW / 2, VH / 2 - 30, 64, '#ffd84a', 'center', '#000', 10);
-      txt(ctx, 'Setz dich auf die Rutschmatte … und los!', VW / 2, VH / 2 + 30, 22, '#fff', 'center', '#000', 5);
+      txt(ctx, 'Setz dich auf die Kokosmatte … und los!', VW / 2, VH / 2 + 30, 22, '#fff', 'center', '#000', 5);
     }
     G.ui.touchHint(ctx, ['◀', '▶']);
   }

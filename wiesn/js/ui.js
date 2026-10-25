@@ -174,6 +174,7 @@ G.ui = (function () {
     for (const id of G.missions.available()) { const m = G.missions.defs[id]; b.push({ x: m.giver.x, y: m.giver.y, letter: m.letter, col: m.color }); }
     const tgt = G.missions.currentTarget();
     if (tgt) b.push({ x: tgt.x, y: tgt.y, target: true });
+    if (G.events) for (const e of G.events.blips()) b.push(e);
     return b;
   }
   function drawMinimap(ctx, W, H) {
@@ -245,20 +246,20 @@ G.ui = (function () {
 
   // ---------- Pausenmenü ----------
   const pause = { tab: 0, sel: 0, scroll: 0 };
-  const TABS = ['Missionen', 'Wiesn-Wissen', 'Steuerung', 'Optionen'];
+  const TABS = ['Missionen', 'Wiesn-Wissen', 'Erfolge', 'Steuerung', 'Optionen'];
   function drawPause(ctx, W, H, clicks) {
     ctx.fillStyle = 'rgba(10,10,30,.93)'; ctx.fillRect(0, 0, W, H);
     drawLogo(ctx, W / 2, 56, Math.min(1, W / 900) * 0.6);
-    const tw = Math.min(180, (W - 40) / 4);
+    const tw = Math.min(170, (W - 40) / TABS.length);
     TABS.forEach((t, i) => {
-      const x = W / 2 - tw * 2 + i * tw, y = 120;
+      const x = W / 2 - tw * TABS.length / 2 + i * tw, y = 120;
       ctx.fillStyle = pause.tab === i ? '#ff6bd5' : 'rgba(255,255,255,.12)'; rrect(ctx, x + 4, y, tw - 8, 36, 8); ctx.fill();
       txt(ctx, t, x + tw / 2, y + 18, Math.min(15, tw / 9), '#fff', 'center', null);
       for (const c of clicks) if (c.x > x && c.x < x + tw && c.y > y && c.y < y + 36) { pause.tab = i; pause.scroll = 0; }
     });
     const I = G.input;
-    if (I.hit('right')) { pause.tab = (pause.tab + 1) % 4; pause.scroll = 0; }
-    if (I.hit('left')) { pause.tab = (pause.tab + 3) % 4; pause.scroll = 0; }
+    if (I.hit('right')) { pause.tab = (pause.tab + 1) % TABS.length; pause.scroll = 0; }
+    if (I.hit('left')) { pause.tab = (pause.tab + TABS.length - 1) % TABS.length; pause.scroll = 0; }
     if (I.hit('down')) pause.scroll++;
     if (I.hit('up')) pause.scroll = Math.max(0, pause.scroll - 1);
     const x0 = Math.max(20, W / 2 - 380), cw = Math.min(760, W - 40);
@@ -292,10 +293,13 @@ G.ui = (function () {
       }
       txt(ctx, '▲▼ blättern', W - 30, H - 70, 12, '#aaa', 'right', null);
     } else if (pause.tab === 2) {
+      y = G.trophies.drawList(ctx, x0, y, cw, H, pause.scroll);
+    } else if (pause.tab === 3) {
       const rows = [
         ['Laufen', 'Pfeiltasten / WASD  ·  Touch: linker Daumen'], ['Rennen', 'Shift halten (kostet Puste)'], ['Aktion', 'E / Enter – reden, kaufen, Roller, Fahrgeschäfte'],
         ['Karte', 'M'], ['Radio wechseln', 'R'], ['Pause', 'Esc / P'],
         ['Toboggan', '◀ ▶ Gleichgewicht halten, ▼ krabbeln (nach 2 Stürzen)'], ['Teufelsrad', 'Richtung = gegen die Fliehkraft drücken, Kraft einteilen; Leertaste gegen das Lasso'],
+        ['Hau den Lukas', 'Erst Kraft stoppen, dann in der Mitte treffen (E)'], ['Dosenwerfen', '◀ ▶ zielen, E halten und loslassen'], ['Schiffschaukel', 'E drücken, wenn die Schaukel unten durch den grünen Bereich saust'],
         ['Ordner-Sterne', 'Wer wild herumrempelt, bekommt Ärger mit den Ordnern. Weglaufen oder brav sein – dann verschwinden die Sterne wieder.'],
       ];
       for (const [a, b] of rows) {
@@ -309,6 +313,7 @@ G.ui = (function () {
         ['Musik: ' + (G.audio.musicVolume > 0 ? 'an' : 'aus'), () => G.audio.setMusicVolume(G.audio.musicVolume > 0 ? 0 : 1)],
         ['Sprachausgabe (Ansager): ' + (G.audio.speech ? 'an' : 'aus'), () => { G.audio.speech = !G.audio.speech; G.game.save(); }],
         ['Lebkuchenherzen auf der Karte zeigen: ' + (G.game.showHeartsOnMap ? 'ja' : 'nein'), () => { G.game.showHeartsOnMap = !G.game.showHeartsOnMap; }],
+        ['Wiesn-Postkarte speichern (Foto)', () => { G.game.photo(); }],
         ['Spiel speichern', () => { G.game.save(); toast('Gespeichert!'); }],
         ['Zurück zum Titelbild', () => { G.game.save(); G.game.toTitle(); }],
       ];
@@ -387,7 +392,8 @@ G.ui = (function () {
   }
   // Minispiele melden, welche Touch-Knöpfe sie brauchen
   function touchHint(ctx, spec) {
-    if (spec.includes('stick')) touchMode = 'stick';
+    if (spec.length === 1 && spec[0] === 'E') touchMode = 'tap';
+    else if (spec.includes('stick')) touchMode = 'stick';
     else if (spec.includes('▼')) touchMode = 'lrd';
     else touchMode = 'lr';
   }
