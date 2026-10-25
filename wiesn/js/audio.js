@@ -126,7 +126,9 @@ G.audio = (function () {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ac = new AC();
-    master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = 0.8;
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 6;
+    master.connect(comp); comp.connect(ac.destination);
     musicGain = ac.createGain(); musicGain.gain.value = 0.26; musicGain.connect(master);
     sfxGain = ac.createGain(); sfxGain.gain.value = 0.55; sfxGain.connect(master);
     noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
@@ -165,7 +167,7 @@ G.audio = (function () {
         const base = rand(170, 380), off = rand(0, 0.25), rate = rand(0.11, 0.16);
         for (let i = 0; i < 5; i++) {
           const t = t0 + off + i * rate;
-          tone(base * (1 - i * 0.04), t, rate * 0.8, 'sawtooth', 0.07, rand(800, 1300), sfxGain, { ftype: 'bandpass', q: 3, a: 0.015 });
+          tone(base * (1 - i * 0.04), t, rate * 0.8, 'sawtooth', 0.22, rand(800, 1300), sfxGain, { ftype: 'bandpass', q: 2, a: 0.015 });
         }
       }
     },
@@ -173,7 +175,7 @@ G.audio = (function () {
     jingle() { if (!ac) return; const t = ac.currentTime; const notes = [67, 72, 76, 79, 84]; notes.forEach((n, i) => { tone(mtof(n), t + i * 0.11, 0.5, 'sawtooth', 0.12, 2500, sfxGain, { vib: 5 }); tone(mtof(n - 12), t + i * 0.11, 0.5, 'triangle', 0.15, 900, sfxGain); }); tone(mtof(48), t + 0.55, 1.2, 'triangle', 0.3, 700, sfxGain); [72, 76, 79].forEach(n => tone(mtof(n), t + 0.55, 1.2, 'sawtooth', 0.07, 2200, sfxGain, { vib: 6 })); },
     busted() { if (!ac) return; const t = ac.currentTime; [64, 61, 58, 52].forEach((n, i) => tone(mtof(n), t + i * 0.22, 0.4, 'sawtooth', 0.12, 1500, sfxGain, { vib: 3 })); },
     step() { if (!ac) return; noise(ac.currentTime, 0.04, 0.05, 1200, 'bandpass', sfxGain, 2); },
-    boeller() { if (!ac) return; const t = ac.currentTime; noise(t, 1.2, 0.9, 300, 'lowpass', sfxGain); tone(60, t, 0.6, 'sine', 0.9, 200, sfxGain, { slide: 0.4 }); },
+    boeller() { if (!ac) return; const t = ac.currentTime; noise(t, 1.2, 0.45, 300, 'lowpass', sfxGain); tone(60, t, 0.6, 'sine', 0.5, 200, sfxGain, { slide: 0.4 }); },
     bell() { if (!ac) return; const t = ac.currentTime; tone(1568, t, 0.6, 'sine', 0.15, 6000, sfxGain); tone(2093, t, 0.4, 'sine', 0.08, 6000, sfxGain); },
     honk() { if (!ac) return; const t = ac.currentTime; tone(440, t, 0.25, 'square', 0.08, 1200, sfxGain); tone(554, t, 0.25, 'square', 0.08, 1200, sfxGain); },
   };
@@ -199,6 +201,7 @@ G.audio = (function () {
 
   return {
     init, sfx, say,
+    get _ac() { return ac; }, get _master() { return master; },
     STATIONS,
     get station() { return stationIdx; },
     get stationName() { return STATIONS[stationIdx].name; },

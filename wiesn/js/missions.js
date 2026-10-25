@@ -138,7 +138,7 @@ G.missions = (function () {
       dlg([
         { who: 'Frau Zuckerl', text: 'Ach, guad dass du da bist! I muss drei Lebkuchenherzen ausliefern, aber i kann ned weg vom Standl.' },
         { who: 'Frau Zuckerl', text: 'Nimm an Roller, dann bist schneller. Du hast drei Minuten – auf geht’s!' },
-      ], () => { G.player.carry = 'heart'; sd.timer = 180; sd.left = 3; G.game.unlockFact('schmankerl'); }),
+      ], () => { G.player.carry = 'heart'; sd.timer = G.settings.easy ? 240 : 180; sd.left = 3; G.game.unlockFact('schmankerl'); }),
       {
         text: 'Liefere die Lebkuchenherzen aus!', timer: true,
         targets: [

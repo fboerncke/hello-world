@@ -313,6 +313,7 @@ G.ui = (function () {
         ['Musik: ' + (G.audio.musicVolume > 0 ? 'an' : 'aus'), () => G.audio.setMusicVolume(G.audio.musicVolume > 0 ? 0 : 1)],
         ['Sprachausgabe (Ansager): ' + (G.audio.speech ? 'an' : 'aus'), () => { G.audio.speech = !G.audio.speech; G.game.save(); }],
         ['Lebkuchenherzen auf der Karte zeigen: ' + (G.game.showHeartsOnMap ? 'ja' : 'nein'), () => { G.game.showHeartsOnMap = !G.game.showHeartsOnMap; }],
+        ['Schwierigkeit: ' + (G.settings.easy ? 'Kinderleicht' : 'Normal'), () => { G.settings.easy = !G.settings.easy; G.game.save(); }],
         ['Wiesn-Postkarte speichern (Foto)', () => { G.game.photo(); }],
         ['Spiel speichern', () => { G.game.save(); toast('Gespeichert!'); }],
         ['Zurück zum Titelbild', () => { G.game.save(); G.game.toTitle(); }],

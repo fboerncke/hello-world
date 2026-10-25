@@ -73,7 +73,7 @@
         localStorage.setItem(SAVE_KEY, JSON.stringify({
           name: P.name, female: P.female, taler: game.taler, gaudi: game.gaudi, day: game.day, clock: game.clock,
           done: G.missions.done, hearts: game.hearts.map(h => h.got), facts: [...game.facts], wearsHeart: P.wearsHeart,
-          x: P.x, y: P.y, speech: A.speech, oideSeen: game.oideSeen, ozapft: game.ozapft, brezn: !!G.flags.brezn, trophies: G.trophies.save(), plush: !!P.plush,
+          x: P.x, y: P.y, speech: A.speech, easy: G.settings.easy, oideSeen: game.oideSeen, ozapft: game.ozapft, brezn: !!G.flags.brezn, trophies: G.trophies.save(), plush: !!P.plush,
         }));
       } catch (e) { /* Speichern nicht möglich */ }
     },
@@ -99,7 +99,7 @@
     game.taler = 0; game.gaudi = 0; game.day = 1; game.clock = 600; game.facts = new Set(); G.flags = {};
     game.oideSeen = false; game.ozapft = false;
     G.trophies.load(null); G.events.reset(); P.plush = false;
-    startLoading(() => { game.scene = 'world'; G.missions.begin('servus'); });
+    startLoading(() => { startIntro(() => G.missions.begin('servus')); });
   }
   function continueGame(s) {
     G.missions.reset();
@@ -111,6 +111,7 @@
     Object.assign(G.missions.done, s.done || {});
     (s.hearts || []).forEach((g, i) => { if (game.hearts[i]) game.hearts[i].got = g; });
     if (s.speech !== undefined) A.speech = s.speech;
+    G.settings.easy = !!s.easy;
     game.oideSeen = !!s.oideSeen; game.ozapft = !!s.ozapft; G.flags.brezn = !!s.brezn;
     G.trophies.load(s.trophies); G.events.reset(); P.plush = !!s.plush;
     if (WD.solidAt(P.x, P.y, 9)) { P.x = 2240; P.y = 240; }
@@ -170,9 +171,10 @@
         { who: 'Museumsführerin', text: 'Und weißt du, warum’s Wiesn heißt? Weil 1810 auf dieser Wiese die Hochzeit von Ludwig und Therese gefeiert wurde – mit einem Pferderennen!' },
       ]);
     });
-    interact.push({ x: WD.places.service.x, y: WD.places.service.y, r: 46, foot: true, label: () => 'Oma im Servicezentrum besuchen', act: () => {
+    interact.push({ x: WD.places.service.x, y: WD.places.service.y, r: 46, foot: true, label: () => 'Oma besuchen (Wiesn-Quiz)', act: () => {
+      const quiz = () => game.startMinigame('quiz', {}, (r) => { game.addTaler(r.score * 2); game.addGaudi(r.score * 2); if (r.score === 5) G.trophies.unlock('quiz'); });
       if (game.taler < 3) { game.addTaler(10); G.ui.dialog([{ who: 'Oma Resi', text: 'Na, is’s Geld scho alle? Do hast no a bisserl Taschengeld – 10 Taler. Aber ned alles für Zuckerwatte ausgeben!' }]); }
-      else G.ui.dialog([{ who: 'Oma Resi', text: pick(['I sitz hier und rast mi a bisserl aus. Geh nur, schau dir die Wiesn an!', 'Hast scho de versteckten Lebkuchenherzen gfunden? Do steckt a Haufen Wiesn-Wissen drin!', 'Um 20 Uhr gehn mir hoam, gell? Dann dürfen Kinder nur no mit Erwachsenen auf d’Festwiese.']) }]);
+      else G.ui.dialog([{ who: 'Oma Resi', text: pick(['I sitz hier und rast mi a bisserl aus.', 'Hast scho de versteckten Lebkuchenherzen gfunden? Do steckt a Haufen Wiesn-Wissen drin!', 'Um 20 Uhr gehn mir hoam, gell?']) + ' Magst a Wiesn-Quiz mit mir machen? Für jede richtige Antwort gibt’s 2 Taler!' }], quiz);
       game.unlockFact('service');
     } });
   }
@@ -348,7 +350,7 @@
     if (game.stars === 0 && game.chasers.length) { game.chasers.length = 0; G.ui.toast('Die Ordner haben aufgegeben. Puh!', 2.5); }
     for (const o of game.chasers) {
       const dx = P.x - o.x, dy = P.y - o.y, d = Math.hypot(dx, dy);
-      const sp = 150 + game.stars * 28;
+      const sp = G.settings.easy ? 125 + game.stars * 20 : 150 + game.stars * 28;
       if (d > 1) { o.x += dx / d * sp * dt; o.y += dy / d * sp * dt; o.dir = Math.atan2(dy, dx); o.moving = true; o.walk += dt * 14; }
       WD.collide(o, 9);
       if (Math.random() < dt * 0.25) { o.say = pick(['Stehenbleiben!', 'Langsam, Freundchen!', 'Halt! Ordner!', 'Bleib stehn!']); o.sayT = 1.5; }
@@ -388,7 +390,7 @@
     if (d0.sniff > 0) { d0.sniff -= dt; d0.moving = false; }
     else {
       let sp = 70;
-      if (d < 230) { const away = Math.atan2(d0.y - P.y, d0.x - P.x); d0.wa += angDiff(d0.wa, away + Math.sin(G.time * 3) * 0.6) * Math.min(1, dt * 6); sp = 215; }
+      if (d < 230) { const away = Math.atan2(d0.y - P.y, d0.x - P.x); d0.wa += angDiff(d0.wa, away + Math.sin(G.time * 3) * 0.6) * Math.min(1, dt * 6); sp = G.settings.easy ? 185 : 215; }
       else d0.wa += rand(-1, 1) * dt * 2;
       d0.x += Math.cos(d0.wa) * sp * dt; d0.y += Math.sin(d0.wa) * sp * dt;
       const res = WD.collide(d0, 8);
@@ -707,6 +709,7 @@
       for (const c of clicks) if (Math.abs(c.x - x) < 120 && c.y > y - 190 && c.y < y + 110) { if (game.charSel === i) chosen = i; else { game.charSel = i; A.sfx.blip(); } }
     });
     txt(ctx, '◀ ▶ wählen  ·  E / Enter bestätigen (oder nochmal antippen)', W / 2, H - 30, 14, '#fff', 'center', '#1a0a2a', 4);
+    txt(ctx, 'Tipp für Jüngere: Im Pausenmenü (Optionen) gibt es den Modus „Kinderleicht“.', W / 2, H - 54, 12, '#ffe2f2', 'center', '#1a0a2a', 3);
     if (I.hit('act') || I.hit('space')) chosen = game.charSel;
     if (I.hit('back')) game.scene = 'title';
     if (chosen >= 0) { A.sfx.jingle(); newGame(opts[chosen].female); }
@@ -731,8 +734,35 @@
   }
 
   // ---------- Riesenrad-/Bavaria-Blick & Abspann ----------
+  function startIntro(cb) {
+    game.scene = 'view';
+    game.view = { kind: 'intro', t: 0, dur: 14, cb, lines: [] };
+    A.sfx.whoosh(2);
+  }
+  const INTRO_KF = [[0, 360, 1150, 0.85], [3.5, 900, 760, 1.0], [7, 1700, 600, 0.95], [10.5, 2240, 420, 1.1], [14, 2240, 240, 1.3]];
+  const INTRO_TXT = [[0.5, 'MÜNCHEN', 'Theresienwiese'], [3.5, 'DAS OKTOBERFEST', 'Die Wiesn – seit 1810'], [7, 'FESTZELTE, BLASMUSIK, FAHRGESCHÄFTE', 'Toboggan · Teufelsrad · Riesenrad · Krinoline'], [10.5, 'UND MITTENDRIN:', 'DU.']];
+  function drawIntro(v) {
+    let i = 0; while (i < INTRO_KF.length - 2 && v.t > INTRO_KF[i + 1][0]) i++;
+    const a = INTRO_KF[i], b = INTRO_KF[i + 1], f = smooth(clamp((v.t - a[0]) / (b[0] - a[0]), 0, 1));
+    const zf = baseZoom() / 1.3;
+    renderWorld(ctx, { x: lerp(a[1], b[1], f), y: lerp(a[2], b[2], f), z: lerp(a[3], b[3], f) * zf });
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const bar = Math.min(H * 0.12, 80) * (1 - smooth(clamp(v.t - v.dur + 1, 0, 1)));
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar);
+    for (const [tt, l1, l2] of INTRO_TXT) {
+      const al = clamp((v.t - tt) * 2, 0, 1) * clamp((tt + 3.2 - v.t) * 2, 0, 1);
+      if (al <= 0) continue;
+      ctx.globalAlpha = al;
+      txt(ctx, l1, W * 0.08, H * 0.7, Math.min(46, W / 16), '#ffd84a', 'left', '#000', 7);
+      txt(ctx, l2, W * 0.08, H * 0.7 + Math.min(46, W / 16), Math.min(24, W / 30), '#fff', 'left', '#000', 5);
+      ctx.globalAlpha = 1;
+    }
+    txt(ctx, '[E] überspringen', W - 16, H - bar / 2, 12, 'rgba(255,255,255,.6)', 'right', null);
+    if ((v.t > 1 && I.hit('act')) || v.t > v.dur) { game.scene = 'world'; game.view = null; const cb = v.cb; I.consume('act'); cb(); }
+  }
   function drawView(dt) {
     const v = game.view; v.t += dt;
+    if (v.kind === 'intro') return drawIntro(v);
     const fit = Math.min(W / 3100, H / 2300);
     const k = smooth(clamp(v.t / 3, 0, 1)) * (1 - smooth(clamp((v.t - v.dur + 2) / 2, 0, 1)));
     const from = v.kind === 'riesenrad' ? { x: 1010, y: 200 } : { x: 360, y: 800 };

@@ -1,6 +1,7 @@
 'use strict';
 // Gemeinsamer Namensraum und Hilfsfunktionen für GTA Wiesn
 const G = {};
+G.settings = { easy: false };
 const TAU = Math.PI * 2;
 const FONT = '"Arial Black","Segoe UI Black","Helvetica Neue",Impact,sans-serif';
 

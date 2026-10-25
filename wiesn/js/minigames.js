@@ -100,7 +100,7 @@ G.toboggan = (function () {
       return;
     }
     if (st.phase === 'belt') {
-      const easy = (st.falls >= 4 ? 0.75 : 1) * (st.helper ? 0.6 : 1);
+      const easy = (st.falls >= 4 ? 0.75 : 1) * (st.helper ? 0.6 : 1) * (G.settings.easy ? 0.7 : 1);
       const vb = 1.15 * easy * (st.crawl ? 0.8 : 1);
       st.crawl = st.crawlUnlocked && I.down('down');
       // instabiles Gleichgewicht (umgedrehtes Pendel)

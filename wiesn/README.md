@@ -58,7 +58,10 @@ Läuft am Rechner mit Tastatur und auf Tablet/Handy mit Touch-Steuerung (virtuel
 - **Minispiele:** Hau den Lukas (Kinderversion), Dosenwerfen (Gewinn: ein Teddy zum Mitnehmen),
   Schiffschaukel mit Bremsbrett
 - **Oide Wiesn:** Krinoline, Schiffschaukel, Kettenflieger Kalb von 1919, Museumszelt mit Velodrom
-- **18 Erfolge** (Pokale) und eine **Wiesn-Postkarte**: Im Pausenmenü ein Foto der aktuellen Szene
+- **Intro-Kameraflug** über die Theresienwiese zum Spielstart
+- **Omas Wiesn-Quiz** im Servicezentrum: fragt die recherchierten Fakten ab (2 Taler pro richtige Antwort)
+- Schwierigkeitsgrad **„Kinderleicht“** im Pausenmenü für jüngere Kinder
+- **19 Erfolge** (Pokale) und eine **Wiesn-Postkarte**: Im Pausenmenü ein Foto der aktuellen Szene
   als PNG-Postkarte speichern
 
 Außerdem: Riesenrad (Blick über das ganze Gelände), Bavaria (Aussicht aus dem Kopf),
@@ -132,3 +135,4 @@ wiesn/
 | ![Blick aus dem Riesenrad](screenshots/riesenrad-blick.png) | ![Erwischt](screenshots/erwischt.png) |
 | ![Einzug der Wiesnwirte](screenshots/einzug-der-wiesnwirte.png) | ![Im Hacker-Festzelt](screenshots/festzelt-hacker.png) |
 | ![Hau den Lukas](screenshots/hau-den-lukas.png) | ![Wiesn-Postkarte](screenshots/postkarte.png) |
+| ![Omas Wiesn-Quiz](screenshots/quiz.png) | |

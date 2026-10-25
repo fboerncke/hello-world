@@ -702,7 +702,7 @@ G.events = (function () {
     // Ferdl fährt die Ringe ab (mit Gummiband, damit es spannend bleibt)
     const f = r.ferdl, fc = CPS[r.fidx];
     const lead = (r.fidx - r.idx);
-    let target = lead > 0 ? 250 : lead < -1 ? 340 : 300;
+    let target = (lead > 0 ? 250 : lead < -1 ? 340 : 300) * (G.settings.easy ? 0.88 : 1);
     r.ferdl.stumble -= dt;
     if (f.stumble < 0 && f.stumble > -1.5) { target = 60; if (!f.said) { f.said = true; f.say = 'Hoppla, a Dackel!'; } }
     else f.say = null;
@@ -846,7 +846,7 @@ G.missions.add('rennen', {
     cb(res);
   });
   const tr = G.teufelsrad.start;
-  G.teufelsrad.start = (opts, cb) => tr(opts, (res) => {
+  G.teufelsrad.start = (opts, cb) => tr(Object.assign({}, opts, { assist: ((opts && opts.assist) || 0) + (G.settings.easy ? 2 : 0) }), (res) => {
     if (res.win) G.trophies.unlock(opts && opts.hard ? 'meister' : 'tr_win');
     cb(res);
   });
@@ -946,6 +946,108 @@ G.zelt = (function () {
     ctx.font = '700 16px ' + FONT;
     wrapText(ctx, cur, VW - 40).slice(0, 2).forEach((l, i) => txt(ctx, l, VW / 2, 14 + i * 20, 15, '#fff', 'center', null, 0, '700 '));
     for (let k = 0; k < 3; k++) { const p = (t * 0.5 + k / 3) % 1; ctx.globalAlpha = 1 - p; txt(ctx, '♪', 380 + k * 100, 140 - p * 80, 22, '#ffe46b', 'center', null); ctx.globalAlpha = 1; }
+    G.ui.touchHint(ctx, ['E']);
+  }
+  return { start, update, draw, get _st() { return st; } };
+})();
+
+// =====================================================================
+// WIESN-QUIZ mit Oma Resi (fragt die recherchierten Fakten ab)
+// =====================================================================
+G.trophies.LIST.push(['quiz', 'Wiesn-Professor', 'Alle fünf Fragen im Wiesn-Quiz richtig beantwortet']);
+G.quiz = (function () {
+  const Q = [
+    ['Seit welchem Jahr steht der Toboggan auf der Wiesn?', '1933', '1810', '1989'],
+    ['Wie lang ist das Förderband am Toboggan ungefähr?', '8 Meter', '2 Meter', '50 Meter'],
+    ['Was bedeutet das Wort „Toboggan“?', 'Leichter Holzschlitten', 'Wasserrutsche', 'Kleiner Turm'],
+    ['Wer brachte das Teufelsrad 1908 auf die Wiesn?', 'Der Schausteller Carl Gabriel', 'Karl Valentin', 'König Ludwig I.'],
+    ['Womit holt man Sitzenbleiber vom Teufelsrad?', 'Mit Ball am Seil und Lasso', 'Mit einer Wasserspritze', 'Mit einer Trompete'],
+    ['Wo ist man beim Teufelsrad am sichersten?', 'Genau in der Mitte', 'Ganz am Rand', 'Auf dem Bauch am Rand'],
+    ['Warum heißt die Festwiese „Theresienwiese“?', 'Wegen der Hochzeit von Ludwig und Therese', 'Wegen einer Kuh namens Therese', 'Weil dort Theresa wohnte'],
+    ['Wohin gehen Kinder, die ihre Familie verloren haben?', 'Zum Servicezentrum hinterm Schottenhamel', 'Zum Riesenrad', 'Zur Krinoline'],
+    ['Wie viele Böllerschüsse knallen nach dem Anstich an der Bavaria?', 'Zwölf', 'Drei', 'Hundert'],
+    ['Wer reitet beim Einzug der Wiesnwirte vorneweg?', 'Das Münchner Kindl', 'Der Toboggan-Toni', 'Ein Dackel'],
+    ['Wie viele Loopings hat der Olympia-Looping?', 'Fünf', 'Drei', 'Zehn'],
+    ['Seit wann gibt es den Schichtl auf der Wiesn?', 'Seit 1869', 'Seit 1999', 'Seit 2010'],
+    ['Aus welchem Jahr stammt der Kettenflieger Kalb?', '1919', '1990', '2015'],
+    ['Ab wann dürfen Kinder unter 16 nur noch mit Erwachsenen auf der Festwiese bleiben?', 'Ab 20 Uhr', 'Ab 12 Uhr', 'Ab 16 Uhr'],
+    ['Wie hoch ist das Riesenrad ungefähr?', 'Rund 50 Meter', 'Rund 10 Meter', 'Rund 300 Meter'],
+    ['Wie heißt der historische Teil im Süden der Wiesn?', 'Oide Wiesn', 'Kloane Wiesn', 'Neie Wiesn'],
+    ['Was ruft der Oberbürgermeister beim Anstich?', '„O’zapft is!“', '„Prost Mahlzeit!“', '„Auf geht’s!“'],
+    ['Worauf rutscht man am Toboggan die Holzrutsche hinunter?', 'Auf Kokosmatten', 'Auf Skiern', 'Auf Luftmatratzen'],
+    ['Was kann man im Museumszelt der Oidn Wiesn ausprobieren?', 'Hochräder im Velodrom', 'Einen Flugsimulator', 'Ein Tauchbecken'],
+    ['Was steht neben der Bavaria?', 'Ein Löwe', 'Ein Elefant', 'Ein Dackel'],
+  ];
+  let st = null;
+  function start(opts, onEnd) {
+    const qs = Q.slice().sort(() => Math.random() - 0.5).slice(0, 5).map(q => {
+      const ans = [q[1], q[2], q[3]].sort(() => Math.random() - 0.5);
+      return { q: q[0], ans, right: ans.indexOf(q[1]) };
+    });
+    st = { onEnd, qs, i: 0, sel: 0, score: 0, phase: 'ask', t: 0, pt: 0, picked: -1 };
+    G.audio.say(qs[0].q, 1.2);
+  }
+  function choose(k) {
+    const q = st.qs[st.i];
+    st.picked = k; st.phase = 'show'; st.pt = 0;
+    if (k === q.right) { st.score++; G.audio.sfx.coin(); G.audio.say(pick(['Richtig!', 'Bravo!', 'Genau!']), 1.2); }
+    else { G.audio.sfx.blip(200); G.audio.say('Leider falsch. Richtig is: ' + q.ans[q.right], 1.2); }
+  }
+  function update(dt) {
+    const I = G.input; st.t += dt; st.pt += dt;
+    if (st.phase === 'ask') {
+      if (I.hit('down') || I.hit('right')) st.sel = (st.sel + 1) % 3;
+      if (I.hit('up') || I.hit('left')) st.sel = (st.sel + 2) % 3;
+      if (st.pt > 0.2 && (I.hit('act') || I.hit('space'))) choose(st.sel);
+      for (const c of G.frameClicks) { const k = st.boxHit ? st.boxHit(c) : -1; if (k >= 0 && st.pt > 0.2) { choose(k); break; } }
+    } else if (st.phase === 'show') {
+      if ((st.pt > 0.6 && (I.hit('act') || I.hit('space') || G.frameClicks.length)) || st.pt > 3) {
+        st.i++; st.sel = 0; st.picked = -1;
+        if (st.i >= st.qs.length) { st.phase = 'done'; st.pt = 0; if (st.score === 5) { G.audio.sfx.jingle(); G.audio.sfx.cheer(); } }
+        else { st.phase = 'ask'; st.pt = 0; G.audio.say(st.qs[st.i].q, 1.2); }
+      }
+    } else if (st.phase === 'done' && st.pt > 1 && (I.hit('act') || I.hit('space') || G.frameClicks.length)) {
+      const cb = st.onEnd, r = { score: st.score }; st = null; cb(r);
+    }
+  }
+  function draw(ctx) {
+    if (!st) return;
+    const g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, '#2a1a5a'); g.addColorStop(1, '#d84a8a');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+    rauten(ctx, 0, 0, VW, 24, 14);
+    // Oma als Quizmasterin
+    G.ent.drawPerson(ctx, { x: 120, y: 470, dir: 0.2, look: { female: true, skin: '#f1c9a5', hair: '#c8c8c8', dirndl: '#6a2a4a', apron: '#f2d0e0', kind: 'oma' }, size: 4, happy: true, armsUp: st.phase === 'show' && st.picked === (st.qs[st.i] || {}).right });
+    txt(ctx, 'OMAS WIESN-QUIZ', VW / 2 + 60, 58, 34, '#ffd84a', 'center', '#000', 7);
+    if (st.phase === 'done') {
+      txt(ctx, st.score + ' von 5 richtig!', VW / 2 + 60, 220, 48, '#fff', 'center', '#000', 8);
+      txt(ctx, st.score === 5 ? 'Du bist a echter Wiesn-Professor!' : st.score >= 3 ? 'Sauber! Fast alles gewusst.' : 'Such die Lebkuchenherzen – da steht viel Wiesn-Wissen drin!', VW / 2 + 60, 290, 20, '#ffe2f2', 'center', '#000', 5);
+      txt(ctx, '+' + st.score * 2 + ' Taler   [E]', VW / 2 + 60, 350, 22, '#9cff7a', 'center', '#000', 5);
+      G.ui.touchHint(ctx, ['E']);
+      return;
+    }
+    const q = st.qs[st.i];
+    txt(ctx, 'Frage ' + (st.i + 1) + ' / 5', VW / 2 + 60, 100, 16, '#fff', 'center', null);
+    ctx.font = '800 22px ' + FONT;
+    wrapText(ctx, q.q, 620).forEach((l, k) => txt(ctx, l, VW / 2 + 60, 140 + k * 30, 22, '#fff', 'center', '#000', 5, '800 '));
+    const boxes = [];
+    q.ans.forEach((a, k) => {
+      const bx = 290, by = 220 + k * 84, bw = 580, bh = 64;
+      boxes.push([bx, by, bw, bh]);
+      let col = 'rgba(255,255,255,.14)';
+      if (st.phase === 'ask' && st.sel === k) col = 'rgba(255,79,184,.75)';
+      if (st.phase === 'show') col = k === q.right ? 'rgba(60,200,100,.85)' : (k === st.picked ? 'rgba(220,60,60,.85)' : 'rgba(255,255,255,.1)');
+      ctx.fillStyle = col; rrect(ctx, bx, by, bw, bh, 14); ctx.fill();
+      txt(ctx, ['A', 'B', 'C'][k], bx + 32, by + bh / 2, 24, '#ffd84a', 'center', '#000', 4);
+      txt(ctx, a, bx + 66, by + bh / 2, 19, '#fff', 'left', null, 0, '800 ');
+    });
+    // Klick/Tipp-Erkennung in virtuellen Koordinaten
+    st.boxHit = (c) => {
+      const cv = document.getElementById('c'), W = cv.clientWidth, H = cv.clientHeight;
+      const s = Math.min(W / VW, H / VH), ox = (W - VW * s) / 2, oy = (H - VH * s) / 2;
+      const x = (c.x - ox) / s, y = (c.y - oy) / s;
+      return boxes.findIndex(([bx, by, bw, bh]) => x > bx && x < bx + bw && y > by && y < by + bh);
+    };
+    if (st.phase === 'ask') txt(ctx, '▲▼ auswählen · E bestätigen · oder Antwort antippen', VW / 2 + 60, 500, 13, 'rgba(255,255,255,.8)', 'center', null);
     G.ui.touchHint(ctx, ['E']);
   }
   return { start, update, draw, get _st() { return st; } };
